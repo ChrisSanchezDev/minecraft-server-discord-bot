@@ -1,3 +1,3 @@
-# laptop-modded-minecraft-server
+# minecraft-server-discord-bot
 
 Hi

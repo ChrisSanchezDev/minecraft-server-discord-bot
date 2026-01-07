@@ -1,11 +1,12 @@
 # -----IMPORTS & SETUP-----
+import asyncio
 import os
 import discord
+from aiomcrcon import Client
 from datetime import datetime, timedelta
 from discord.ext import tasks, commands
 from dotenv import load_dotenv
 from wakeonlan import send_magic_packet
-from mcrcon import MCRcon
 from mcstatus import JavaServer
 
 load_dotenv()
@@ -13,12 +14,13 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 MAC = os.getenv('MAC_ADDRESS')
-IP = os.getenv('SERVER_IP')
-PORT = int(os.getenv('PORT'))
+MSI_IP = os.getenv('MSI_IP')
+SERVER_IP = os.getenv('SERVER_IP')
+RCON_PORT = int(os.getenv('RCON_PORT'))
 RCON_PASS = os.getenv('RCON_PASSWORD')
 
 last_active_time = datetime.now()
-current_state = 'offline'
+server_status = 'offline'
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -38,14 +40,14 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
     elif status == 'booting':
         color = discord.Color.orange()
         title = '🟡 System Booting...'
-        desc = 'Please wait ~2 minutes for services to start.'
+        desc = 'Please wait for services to start.'
     else:
         color = discord.Color.red()
         title = '🔴 System Offline'
         desc = 'Click the button below to start the server'
 
     embed = discord.Embed(title=title, description=desc, color=color)
-    embed.add_field(name='Server Address', value=f'{IP}', inline=False)
+    embed.add_field(name='Server Address', value=f'{SERVER_IP}', inline=False)
 
     # Showing player names if server is Online
     if status == 'online' and player_list:
@@ -57,48 +59,56 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
 
 async def get_server_info():
     global last_active_time
-    global current_state
+    global server_status
 
     # Access the specific channel where the dashboard lives
     channel = bot.get_channel(CHANNEL_ID)
     if not channel:
         return
     
+    if server_status == 'booting':
+        return
+
     try:
-        server = await JavaServer.async_lookup(f'{IP}')
+        server = await JavaServer.async_lookup(f'{MSI_IP}')
         status = await server.async_status()
 
         # If succesful (no crash) + channel is found, we are online
-        current_state = 'online'
+        server_status = 'online'
         player_count = status.players.online
         player_list = [p.name for p in status.players.sample] if status.players.sample else []
 
         # -----WITHIN: AUTO-SHUTDOWN LOGIC-----
-        if player_count > 0:
+        if player_count > 0 and server_status == 'online':
             last_active_time = datetime.now()
         else:
             inactive_duration = datetime.now() - last_active_time
             
             if inactive_duration > timedelta(minutes=30):
+                print('No players detected for 30min. Shutting down server & laptop.')
                 try:
-                    with MCRcon(IP, RCON_PASS, PORT) as mcr:
-                        mcr.command("/say No players detected for 30min! Shutting down...")
-                        mcr.command("/stop")
+                    client = Client(MSI_IP, RCON_PORT, RCON_PASS)
+                    await client.connect()
 
-                    current_state = 'offline'
-                    print('No players detected for 30min. Shutting down server & laptop.')
+                    await client.send_cmd('/say No players detected for 30min. Shutting down server & laptop.')
+                    await client.send_cmd('/stop')
+
+                    await client.close()
+
+                    server_status = 'offline'
+                    print('Shutdown successful.')
                 except Exception as e:
                     print(f"Failed to send RCON stop command: {e}")
     
     except Exception as e:
         # If something fails, the server is either offline or unreachable
-        current_state = 'offline'
+        server_status = 'offline'
         player_count = 0
         player_list = []
         last_active_time = datetime.now()
     
     # Generate a UI card using our factory function
-    embed = create_status_embed(status=current_state, player_count=player_count, player_list=player_list)
+    embed = create_status_embed(status=server_status, player_count=player_count, player_list=player_list)
     view = ServerControlView()
 
     # Find the existing Dashboard msg or create a new one
@@ -109,8 +119,14 @@ async def get_server_info():
             break
 
     if last_message:
-        # Edit the existing message
-        await last_message.edit(embed=embed, view=view)
+        old_embed = last_message.embeds[0] if last_message.embeds else None
+
+        if old_embed and (old_embed.description == embed.description) and (old_embed.color == embed.color):
+            print("Status unchanged. Skipping Discord edit to prevent rate limits.")
+            pass
+        else:
+            await last_message.edit(embed=embed, view=view)
+            print("Status changed! Updating dashboard...")
     else:
         # No dashboard found, so make a new one
         await channel.send(embed=embed, view=view)
@@ -123,9 +139,15 @@ class ServerControlView(discord.ui.View):
     async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
 
-        if current_state == 'online':
+        if server_status == 'online':
             await interaction.followup.send(
                 'Vro, server is already online!',
+                ephemeral=True
+            )
+            return
+        elif server_status == 'booting':
+            await interaction.followup.send(
+                'Vro, server is already booting up! (If more than 2 mins have alrdy passed, it might be stuck...)',
                 ephemeral=True
             )
             return

@@ -12,7 +12,6 @@ BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 MAC = os.getenv('MAC_ADDRESS')
 IP = os.getenv('SERVER_IP')
-PORT = int(os.getenv('SERVER_PORT'))
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -87,7 +86,7 @@ async def update_status():
         return
     
     try:
-        server = await JavaServer.async_lookup(f'{IP}:{PORT}')
+        server = await JavaServer.async_lookup(f'{IP}')
         status = await server.async_status()
 
         # If succesful (no crash) + channel is found, we are online

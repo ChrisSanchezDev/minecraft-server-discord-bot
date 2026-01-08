@@ -33,6 +33,7 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
     if player_list is None:
         player_list = []
     
+    # Dependent on received status
     if status == 'online':
         color = discord.Color.green()
         title = '🟢 System Online'
@@ -47,9 +48,9 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
         desc = 'Click the button below to start the server'
 
     embed = discord.Embed(title=title, description=desc, color=color)
-    embed.add_field(name='Server Address', value=f'{SERVER_IP}', inline=False)
+    embed.add_field(name='IP Address', value=f'{SERVER_IP}', inline=False)
 
-    # Showing player names if server is Online
+    # Showing player names when online
     if status == 'online' and player_list:
         embed.add_field(name='Online Users', value='\n'.join(player_list), inline=False)
 
@@ -66,6 +67,15 @@ async def get_server_info():
     if not channel:
         return
     
+    # TODO: Fix this, booting should occur when:
+        # If laptop is on
+            # If so, check the status of the script
+                # If script enabled but server not responding
+                    # 'booting'
+                # If script disabled
+                    # 'offline'
+        # if no laptop
+            # 'offline'
     if server_status == 'booting':
         return
 
@@ -93,10 +103,13 @@ async def get_server_info():
                     await client.send_cmd('/say No players detected for 30min. Shutting down server & laptop.')
                     await client.send_cmd('/stop')
 
+                    # ------
+                    # Either this or just have it check the laptop, then script status
                     await client.close()
 
                     server_status = 'offline'
                     print('Shutdown successful.')
+                    # ------
                 except Exception as e:
                     print(f"Failed to send RCON stop command: {e}")
     

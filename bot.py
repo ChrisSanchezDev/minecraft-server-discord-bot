@@ -2,6 +2,7 @@
 import asyncio
 import os
 import discord
+im
 from aiomcrcon import Client
 from datetime import datetime, timedelta
 from discord.ext import tasks, commands
@@ -58,7 +59,8 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
     
     return embed
 
-async def get_server_info():
+# -----UPDATING SERVER INFO-----
+async def update_server_info():
     global last_active_time
     global server_status
 
@@ -76,9 +78,13 @@ async def get_server_info():
                     # 'offline'
         # if no laptop
             # 'offline'
-    if server_status == 'booting':
-        return
 
+    # 1) Is the laptop online?
+    try:
+        output = subprocess.run
+    except Exception as e:
+
+    # If laptop is online, check server_status
     try:
         server = await JavaServer.async_lookup(f'{MSI_IP}')
         status = await server.async_status()
@@ -180,20 +186,20 @@ class ServerControlView(discord.ui.View):
     @discord.ui.button(label='Refresh Status', style=discord.ButtonStyle.secondary, custom_id='refresh_btn', emoji='🔄')
     async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
-        await get_server_info()
+        await update_server_info()
 
 # -----BACKGROUND LOOPS & EVENTS-----
 @tasks.loop(seconds=30)
-async def update_status():
-    await get_server_info()
+async def periodically_update_status():
+    await update_server_info()
 
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user} (ID: {bot.user.id})')
 
     # Background loop
-    if not update_status.is_running():
-        update_status.start()
+    if not periodically_update_status.is_running():
+        periodically_update_status.start()
 
     # Re-registering the Button view
     # Required for persistent views to work after a bot restarts

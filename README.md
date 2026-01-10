@@ -1,4 +1,4 @@
-# minecraft-server-discord-bot
+# HomeLab: minecraft-server-discord-bot
 
 Automated Discord Bot that turns on an old MSI laptop thru Wake-On-LAN upon user request, which in turn also turns starts up a modded Minecraft server. When there are no players for 30 minutes, the server and laptop will automatically shutdown to conserve power.
 

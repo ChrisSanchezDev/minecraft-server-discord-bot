@@ -2,7 +2,8 @@
 import asyncio
 import os
 import discord
-im
+import paramiko
+import subprocess
 from aiomcrcon import Client
 from datetime import datetime, timedelta
 from discord.ext import tasks, commands
@@ -20,8 +21,12 @@ SERVER_IP = os.getenv('SERVER_IP')
 RCON_PORT = int(os.getenv('RCON_PORT'))
 RCON_PASS = os.getenv('RCON_PASSWORD')
 
+# 0 means off, 1 means on
+msi_status = 0
+server_status = 0
+script_status = 0
+display_status = 'offline'
 last_active_time = datetime.now()
-server_status = 'offline'
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -37,15 +42,15 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
     # Dependent on received status
     if status == 'online':
         color = discord.Color.green()
-        title = '🟢 System Online'
+        title = '🟢 Server Online'
         desc =  f'**{player_count}/12** players connected.'
     elif status == 'booting':
         color = discord.Color.orange()
-        title = '🟡 System Booting...'
+        title = '🟡 Server Booting...'
         desc = 'Please wait for services to start.'
     else:
         color = discord.Color.red()
-        title = '🔴 System Offline'
+        title = '🔴 Server Offline'
         desc = 'Click the button below to start the server'
 
     embed = discord.Embed(title=title, description=desc, color=color)
@@ -61,8 +66,11 @@ def create_status_embed(status='offline', player_count=0, player_list=None):
 
 # -----UPDATING SERVER INFO-----
 async def update_server_info():
-    global last_active_time
+    global display_status
+    global msi_status
     global server_status
+    global script_status
+    global last_active_time
 
     # Access the specific channel where the dashboard lives
     channel = bot.get_channel(CHANNEL_ID)
@@ -70,61 +78,118 @@ async def update_server_info():
         return
     
     # TODO: Fix this, booting should occur when:
-        # If laptop is on
-            # If so, check the status of the script
-                # If script enabled but server not responding
-                    # 'booting'
-                # If script disabled
+        # Option A OFFLINE SERVER- ONLINE SERVER+
+        # 1. If laptop is on - +
+            # 2.if server responds +
+                # 'online'
+            # 3. else (server not responding) - 
+                # 4. if script is on
+                    # 5. if display_status isnt alrdy 'crashed' and script is moving
+                        # 'booting'
+                    # 6. else (display_status says 'crashed' or script isn't moving)
+                        # 'crashed'
+                # 7. else (script off) -
                     # 'offline'
-        # if no laptop
+        # 8. else (laptop off)
+            # 'offline'
+        
+        # Option B OFFLINE SERVER- ONLINE SERVER+
+        # 1. if laptop is on - +
+            # 2. if script is on +
+                # 3. if server is on +
+                    # 'online'
+                # 4. else (server off)
+                    # 5. if display_status isnt alrdy 'crashed' and script is moving
+                        # 'booting'
+                    # 6. else (display_status says 'crashed' or script isn't moving)
+                        # 'crashed'
+            # 7. else (script off) -
+                # 'offline'
+        # 8. else (laptop off)
             # 'offline'
 
-    # 1) Is the laptop online?
+        ## Option A ends up being more checks when server is offline, but less if it's online
+        ## Option B ends up being more checks when server is online, but less if it's offline
+        ## I think I prefer Option B since, more often than not, the server is going to be offline for more hours in the day.
+        ## But is it more pricey to check if the server is offline or check the script on the MSI laptop? Honestly, if the laptop is on but server off, it shouldnt really matter too much, so maybe Option A is better since most times, the server will be online if the laptop is on.
+
+        ## The display_status == crashed check is mainly because there's a very very small chance that you'll ever go from a crash directly to a boot without having first gone offline. It'll also save us from constant log reading whenever a server crashes.
+
+    # 1. If laptop is on (setup)
     try:
-        output = subprocess.run
+        # Will return a 0 on success, non-zero on failure
+        output = subprocess.run(
+            # '-c 1' is for Linux, '-n 1' would be for Windows
+            ['ping','-c 1', '1', MSI_IP],
+            stdout=subprocess.DEVNULL, # Hides the output since it's long and kinda useless rn
+            stderr=subprocess.DEVNULL
+        )
+        msi_status = int(output.returncode == 0)
     except Exception as e:
+        print(f'Ping failed: {e}')
+        msi_status = 0
 
-    # If laptop is online, check server_status
-    try:
-        server = await JavaServer.async_lookup(f'{MSI_IP}')
-        status = await server.async_status()
+    # 1. If laptop is on (check)
+    if msi_status == 1:
+        # 2. If server responds (setup)
+        try:
+            server = await JavaServer.async_lookup(f'{MSI_IP}')
+            status = await server.async_status()
 
-        # If succesful (no crash) + channel is found, we are online
-        server_status = 'online'
-        player_count = status.players.online
-        player_list = [p.name for p in status.players.sample] if status.players.sample else []
+            # If response didnt crash, server is online
+            server_status = 1
+            player_count = status.players.online
+            player_list = [p.name for p in status.players.sample] if status.players.sample else []
 
-        # -----WITHIN: AUTO-SHUTDOWN LOGIC-----
-        if player_count > 0 and server_status == 'online':
-            last_active_time = datetime.now()
-        else:
-            inactive_duration = datetime.now() - last_active_time
-            
-            if inactive_duration > timedelta(minutes=30):
-                print('No players detected for 30min. Shutting down server & laptop.')
-                try:
-                    client = Client(MSI_IP, RCON_PORT, RCON_PASS)
-                    await client.connect()
+            # -----WITHIN: AUTO-SHUTDOWN LOGIC-----
+            if player_count > 0 and server_status == 'online':
+                last_active_time = datetime.now()
+            else:
+                inactive_duration = datetime.now() - last_active_time
+                
+                if inactive_duration > timedelta(minutes=30):
+                    print('No players detected for 30min. Shutting down server & laptop.')
+                    try:
+                        client = Client(MSI_IP, RCON_PORT, RCON_PASS)
+                        await client.connect()
 
-                    await client.send_cmd('/say No players detected for 30min. Shutting down server & laptop.')
-                    await client.send_cmd('/stop')
+                        await client.send_cmd('/say No players detected for 30min. Shutting down server & laptop.')
+                        await client.send_cmd('/stop')
 
-                    # ------
-                    # Either this or just have it check the laptop, then script status
-                    await client.close()
+                        # ------
+                        # Either this or just have it check the laptop, then script status
+                        await client.close()
 
-                    server_status = 'offline'
-                    print('Shutdown successful.')
-                    # ------
-                except Exception as e:
-                    print(f"Failed to send RCON stop command: {e}")
+                        server_status = 'offline'
+                        print('Shutdown successful.')
+                        # ------
+                    except Exception as e:
+                        print(f"Failed to send RCON stop command: {e}")
     
-    except Exception as e:
-        # If something fails, the server is either offline or unreachable
-        server_status = 'offline'
-        player_count = 0
-        player_list = []
-        last_active_time = datetime.now()
+        except Exception as e:
+            # If something fails, the server is either booting, crashed, or offline.
+            # Booting: Laptop on, Server off, Script on, Last line timestamp less than 60 seconds ago
+            # Crashed: Laptop on, Server off, Script on, last line timestamp 60 seconds ago or more
+            # Offline: Laptop on, Server off, Script off.
+            # All of them will have 0 players currently.
+            player_count = 0
+            player_list = []
+            last_active_time = datetime.now()
+
+            # Boot/Crash Check
+            # If we crash, we shouldnt assume that it'll go back to booting 
+            if script_status == 0
+            # SSH into the MSI Laptop
+            # Check the script
+            # TWO OPTIONS:
+            # Option A: If last line hasnt changed in 60 seconds
+                # 'crashed'
+            # else: 'booting'
+            # Option B: If last line timestamp is 60 secs+ from now
+                # 'crashed'
+            # else: 'booting'
+
+            
     
     # Generate a UI card using our factory function
     embed = create_status_embed(status=server_status, player_count=player_count, player_list=player_list)

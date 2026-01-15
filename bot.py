@@ -1,10 +1,10 @@
 # TODO: Implement daily backup (Probably should be done in another file for modularity)
 
 # -----IMPORTS & SETUP-----
-#import asyncio 
+import asyncio 
 import os
 import discord
-#import paramiko
+import paramiko
 import subprocess
 from aiomcrcon import Client
 from datetime import datetime, timedelta
@@ -35,7 +35,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # -----DASHBOARD SETUP-----
-# Factory function
+# Factory function, sole goal of creating the embed display based on what's given
 def create_status_embed(display_status='offline', player_count=0, player_list=None):
     if player_list is None:
         player_list = []
@@ -71,6 +71,7 @@ def create_status_embed(display_status='offline', player_count=0, player_list=No
     return embed
 
 # -----UPDATING SERVER INFO-----
+# Every 30 secs + whenever a user clicks refresh, the program will go thru multiple checks to see the status of the MSILaptop, script, and server itself.
 async def update_server_info():
     global display_status
     global msi_status
@@ -83,6 +84,7 @@ async def update_server_info():
     if not channel:
         return
     
+    '''
     # Logic Path for Checking Statuses
     # 1. If laptop is on - +
         # 2.if server responds +
@@ -102,8 +104,8 @@ async def update_server_info():
                 # 'offline'
     # 9. else (laptop off)
         # 'offline'
-    
     # Most of the time, the server will be offline and this allows for the fastest check on that + accounting for all variations of the status.
+    '''
 
     # 1. If laptop is on (setup)
     try:
@@ -161,6 +163,8 @@ async def update_server_info():
 
                         # TODO: Laptop shutdown logic
                         # TODO: Give the server atleast 30 secs so that things are saved properly + allow time to cancel the shutdown.
+                        asyncio.sleep(30)
+                        ssh = paramiko.SSHClient()
 
                         msi_status = 0
                         print('MSI Laptop shutdown successful.')
@@ -177,10 +181,12 @@ async def update_server_info():
 
             # TODO: Get a response about the status of the script
             # script_status = 
-
+            
+            '''
             # Booting: msi_status, script_status, server_status = 1, 1, 0 + Last line timestamp less than 60 seconds ago
             # Crashed: msi_status, script_status, server_status = 1, 1, 0 + Last line timestamp 60 seconds ago or more
             # Offline: msi_status, script_status, server_status = 1, 0, 0 
+            '''
 
             # 4. If script is on
             if script_status == 1:

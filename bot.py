@@ -1,4 +1,5 @@
 # TODO: Implement daily backup (Probably should be done in another file for modularity)
+# TODO: include small images of everyone's face icon when they're online
 
 # -----IMPORTS & SETUP-----
 import asyncio 
@@ -26,7 +27,7 @@ SSH_USER = os.getenv('SSH_USER')
 SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
 
 # 0 means off, 1 means on
-msi_status, script_status, server_status = 0, 0, 0 # ??? Does this only happen at the start or do we constantly do this.
+msi_status, script_status, server_status = 0, 0, 0
 display_status = 'offline'
 last_active_time = datetime.now()
 
@@ -37,7 +38,7 @@ intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # -----DASHBOARD SETUP-----
-# Factory function, sole goal of creating the embed display based on what's given
+# Factory function
 def create_status_embed(display_status='offline', player_count=0, player_list=None):
     if player_list is None:
         player_list = []
@@ -49,11 +50,11 @@ def create_status_embed(display_status='offline', player_count=0, player_list=No
         desc = 'Click the button below to start the server.'
     elif display_status == 'crashed':
         color = discord.Color.yellow()
-        title = 'WARNING EMOJI Server Crashed' # TODO: Warning emoji
+        title = '⚠️ Server Crashed'
         desc = 'oop, a server restart is required.'
     elif display_status == 'booting':
         color = discord.Color.orange()
-        title = '🟡 Server Booting...' # TODO: Replace w/ orange emoji
+        title = '🟠 Server Booting...'
         desc = 'Please wait for services to start.'
     else:
         color = discord.Color.green()
@@ -63,9 +64,7 @@ def create_status_embed(display_status='offline', player_count=0, player_list=No
     embed = discord.Embed(title=title, description=desc, color=color)
     embed.add_field(name='IP Address', value=f'{SERVER_IP}', inline=False)
 
-    # Showing player names when online
     if display_status == 'online' and player_list:
-        # TODO: include small images of everyone's face icon
         embed.add_field(name='Online Users', value='\n'.join(player_list), inline=False)
 
     embed.set_footer(text='Minecwaft-Turtle • Refreshes every 30s')
@@ -86,6 +85,31 @@ async def update_server_info():
     if not channel:
         return
     
+    async def run_blocking(func, *args):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, func, *args)
+
+    def ping_msi():
+        return subprocess.run(
+            'ping', '-c', '1', '-W', '1', MSI_IP,
+            stdout=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL
+        )
+
+    def shutdown_msi():
+        print('Attempting MSI Laptop shutdown...')
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+            ssh.connect(MSI_IP, username=SSH_USER, pkey=private_key, timeout=5)
+            ssh.exec_command('shutdown -h now')
+            ssh.close()
+            return True
+        except Exception as e:
+            print(f'MSI Shutdown Failure: {e}')
+            return False
+
     '''
     # Logic Path for Checking Statuses
     # 1. If laptop is on - +
@@ -95,30 +119,23 @@ async def update_server_info():
                 # 'offline'
         # 3. else [exception caught] (server not responding) - 
             # 4. if script is on
-                # 5. if display status is already 'crashed', assume it's still crashed
-                # 6. if last_line_age is old
+                # 5. if last_line_age is old
                     # 'crashed'
-                    # 6.1. create crash.log
-                    # 6.2. shutdown server (auto restart?)
-                # 7. else: (last_line_age still young)
+                    # 5.1. create crash.log
+                    # 5.2. shutdown server (auto restart?)
+                # 6. else: (last_line_age still young)
                     # 'booting'
-            # 8. else (script off) -
+            # 7. else (script off) -
                 # 'offline'
-    # 9. else (laptop off)
+    # 8. else (laptop off)
         # 'offline'
     # Most of the time, the server will be offline and this allows for the fastest check on that + accounting for all variations of the status.
     '''
 
     # 1. If laptop is on (setup)
     try:
-        # Will return a 0 on success, non-zero on failure
-        output = subprocess.run(
-            # '-c 1' is for Linux, '-n 1' would be for Windows
-            ['ping','-c 1', '1', MSI_IP],
-            stdout=subprocess.DEVNULL, # Hides the output since it's long and kinda useless rn
-            stderr=subprocess.DEVNULL
-        )
-        msi_status = int(output.returncode == 0)
+        output = await run_blocking(ping_msi)
+        msi_status = int(output.returncode == 0) # 0 == success
     except Exception as e:
         print(f'Ping failed: {e}')
         msi_status = 0
@@ -127,26 +144,18 @@ async def update_server_info():
     if msi_status == 1:
         # 2. If server responds (setup)
         try:
-            # Tries to get a response from the server thru localhost
-            # If the server is online, the try block will continue
-            # If it's offline, server will return an error and the program will jump to the exception block.
             server = await JavaServer.async_lookup(f'{MSI_IP}')
             status = await server.async_status()
 
-            # No crash, so server is on
             server_status = 1
             player_count = status.players.online
             player_list = [p.name for p in status.players.sample] if status.players.sample else []
             display_status == 'online'
 
             # 2.1. If server is inactive
-            # Inactive: 30 mins with no players
 
-            # Players are online
             if player_count > 0 and server_status == 'online':
                 last_active_time = datetime.now()
-            
-            # Check if server is inactive for 30+ mins
             else:
                 inactive_duration = datetime.now() - last_active_time
                 
@@ -155,41 +164,32 @@ async def update_server_info():
                     try:
                         client = Client(MSI_IP, RCON_PORT, RCON_PASS)
                         await client.connect()
-
                         await client.send_cmd('/say No players detected for 30min. Shutting down server & laptop.')
-                        asyncio.sleep(5)
+                        await asyncio.sleep(3)
                         await client.send_cmd('/stop')
                         await client.close()
-
                         server_status = 0
                         print('Server shutdown successful.') 
 
                         await asyncio.sleep(30)
 
-                        ssh = paramiko.SSHClient() # Creates a blank terminal window
-                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy()) # Auto trusts unknown new connections
+                        success = await run_blocking(shutdown_msi)
 
-                        private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
-
-                        ssh.connect(MSI_IP, username=os.getenv('SSH_USER'), pkey=private_key)
-                        ssh.exec_command('shutdown -h now')
-                        ssh.close()
-
-                        msi_status = 0
-                        print('MSI Laptop shutdown successful.')
-                        return
-
+                        if success:
+                            msi_status = 0
+                            print('MSI Laptop shutdown successful.')
+                            return
+                        
                     except Exception as e:
                         print(f"Failed to send a stop command: {e}")
                         return
 
         # 4. else [exception caught] (server is off)
         except Exception as e:
-            # If something fails, the server is either booting, crashed, or offline.
             server_status = 0
 
-            # TODO: Get a response about the status of the script
-            # script_status = 
+            # TODO: script_status logic
+            script_status = 0 # For testing now
             
             '''
             # Booting: msi_status, script_status, server_status = 1, 1, 0 + Last line timestamp less than 60 seconds ago
@@ -199,19 +199,15 @@ async def update_server_info():
 
             # 4. If script is on
             if script_status == 1:
-                # 5. If we crash, we shouldnt assume that it'll go back to booting
-                # TODO: Possibly remove this. If we auto shutdown, we might have the situation where we go from crash to booting
-                # if display_status == 'crashed':
-                    
-                # TODO: Properly gauge if a line has moved or not
-                last_line_age = 0
+                # TODO: last_line_age logic
+                last_line_age = 0 # For testing now
                 
-                # 6. If last_line_age is longer than 60, server most likely crashed
+                # 5. If last_line_age is old
                 if last_line_age >= 60:
                     display_status = 'crashed'
-                    # TODO: Attempt to turn the crash report into a log
-                    # TODO: Possibly attempt to shutdown the server in this scenario
-                # 7. If last_line_age is still young, server is most likely booting.
+                    # TODO: Attempt to turn crash report into a log
+                    # TODO: Attempt to restart the server in this scenario
+                # 6. If last_line_age is still young
                 else:
                     display_status = 'booting'
             
@@ -228,7 +224,6 @@ async def update_server_info():
         player_count = 0
         player_list = []
     
-    # Generate a UI card using our factory function
     embed = create_status_embed(display_status=display_status, player_count=player_count, player_list=player_list)
     view = ServerControlView()
 
@@ -259,22 +254,20 @@ class ServerControlView(discord.ui.View):
 
     @discord.ui.button(label='Start Server', style=discord.ButtonStyle.green, custom_id='start_btn', emoji='⚡')
     async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Gives a defer message to discord (it asks for Discord to wait longer for a response)
         await interaction.response.defer(ephemeral=True)
 
         if display_status != 'offline':
             button.disabled = True
 
-        send_magic_packet(MSI_MAC) # ??? If this doesn't work, will it crash or just continue?
-
+        send_magic_packet(MSI_MAC)
         await interaction.followup.send(
             'Magic Packet sent! The server is waking up. The dashboard will update shortly.',
             ephemeral=True
         )
 
         embed = create_status_embed(display_status='booting')
+        button.disabled = True #
 
-        button.disabled = True # ??? Does this gray out the button?
         await interaction.message.edit(embed=embed, view=self)
     
     @discord.ui.button(label='Refresh Status', style=discord.ButtonStyle.secondary, custom_id='refresh_btn', emoji='🔄')
@@ -313,11 +306,9 @@ async def periodically_update_status():
 async def on_ready():
     print(f'Logged in as BOT:{bot.user} (ID: {bot.user.id})')
 
-    # Begin 30 sec loop
     if not periodically_update_status.is_running():
-        periodically_update_status.start() # ??? Shouldnt we use asyncio for running this? What differs using asyncio vs. not using asyncio for async python functions.
+        periodically_update_status.start()
 
-    # Re-registering the Button view
     # Required for persistent views to work after a bot restarts
     bot.add_view(ServerControlView())
 

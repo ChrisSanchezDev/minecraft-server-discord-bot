@@ -1,5 +1,9 @@
 # TODO: Implement daily backup (Probably should be done in another file for modularity)
 # TODO: include small images of everyone's face icon when they're online
+# TODO: Crashed status
+# TODO: Crash logs
+# TODO: Auto-restart on Crash
+# TODO: Stop button (with the right user perms)
 
 # -----IMPORTS & SETUP-----
 import asyncio 
@@ -25,6 +29,7 @@ RCON_PORT = int(os.getenv('RCON_PORT'))
 RCON_PASS = os.getenv('RCON_PASSWORD')
 SSH_USER = os.getenv('SSH_USER')
 SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
+INACTIVE_TIMER = os.getenv('INACTIVE_TIMER')
 
 # 0 means off, 1 means on
 msi_status, script_status, server_status = 0, 0, 0
@@ -55,7 +60,7 @@ def create_status_embed(display_status='offline', player_count=0, player_list=No
     elif display_status == 'booting':
         color = discord.Color.orange()
         title = '🟠 Server Booting...'
-        desc = 'Please wait for services to start.'
+        desc = 'Please wait for services to start. (If longer than 3 mins, it prolly crashed)'
     else:
         color = discord.Color.green()
         title = '🟢 Server Online'
@@ -95,6 +100,28 @@ async def update_server_info():
             stdout=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL
         )
+    
+    def check_script_status():
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+            ssh.connect(MSI_IP, username=SSH_USER, pkey=private_key, timeout=5)
+            stdin, stdout, stderr = ssh.exec_command('pgrep -f "server.jar"')
+
+            stdout.channel.settimeout(5.0) # If no answer for 5 secs, fail
+            script_status = stdout.channel.recv_exit_status() # 0: found, 1: not found
+
+            ssh.close()
+
+            if script_status == 0:
+                return 1
+            else:
+                return 0
+
+        except Exception as e:
+            print(f'Script status check failure: {e}')
+            return 0
 
     def shutdown_msi():
         print('Attempting MSI Laptop shutdown...')
@@ -154,13 +181,13 @@ async def update_server_info():
 
             # 2.1. If server is inactive
 
-            if player_count > 0 and server_status == 'online':
+            if player_count > 0 and server_status == 1:
                 last_active_time = datetime.now()
             else:
                 inactive_duration = datetime.now() - last_active_time
                 
-                if inactive_duration > timedelta(minutes=1):
-                    print('No players detected for 30min. Shutting down server & laptop.')
+                if inactive_duration > timedelta(minutes=INACTIVE_TIMER):
+                    print(f'No players detected for {INACTIVE_TIMER}. Shutting down server & laptop.')
                     try:
                         client = Client(MSI_IP, RCON_PORT, RCON_PASS)
                         await client.connect()
@@ -188,9 +215,8 @@ async def update_server_info():
         except Exception as e:
             server_status = 0
 
-            # TODO: script_status logic
-            script_status = 0 # For testing now
-            
+            script_status = await run_blocking(check_script_status)
+        
             '''
             # Booting: msi_status, script_status, server_status = 1, 1, 0 + Last line timestamp less than 60 seconds ago
             # Crashed: msi_status, script_status, server_status = 1, 1, 0 + Last line timestamp 60 seconds ago or more
@@ -199,6 +225,8 @@ async def update_server_info():
 
             # 4. If script is on
             if script_status == 1:
+                display_status = 'booting'
+                '''
                 # TODO: last_line_age logic
                 last_line_age = 0 # For testing now
                 
@@ -210,17 +238,18 @@ async def update_server_info():
                 # 6. If last_line_age is still young
                 else:
                     display_status = 'booting'
+                '''
             
             # 8. else (script off)
             else:
-                display_status == 'offline'
+                display_status = 'offline'
         
         # 9. else (laptop off)
         else:
             msi_status, server_status, script_status = 0, 0, 0
             display_status = 'offline'
     
-    if not display_status == 'online':
+    if display_status != 'online':
         player_count = 0
         player_list = []
     

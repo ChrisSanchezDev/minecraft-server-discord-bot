@@ -22,6 +22,8 @@ MSI_IP = os.getenv('MSI_IP')
 SERVER_IP = os.getenv('SERVER_IP')
 RCON_PORT = int(os.getenv('RCON_PORT'))
 RCON_PASS = os.getenv('RCON_PASSWORD')
+SSH_USER = os.getenv('SSH_USER')
+SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
 
 # 0 means off, 1 means on
 msi_status, script_status, server_status = 0, 0, 0 # ??? Does this only happen at the start or do we constantly do this.
@@ -148,30 +150,37 @@ async def update_server_info():
             else:
                 inactive_duration = datetime.now() - last_active_time
                 
-                if inactive_duration > timedelta(minutes=30):
+                if inactive_duration > timedelta(minutes=1):
                     print('No players detected for 30min. Shutting down server & laptop.')
                     try:
                         client = Client(MSI_IP, RCON_PORT, RCON_PASS)
                         await client.connect()
 
                         await client.send_cmd('/say No players detected for 30min. Shutting down server & laptop.')
+                        asyncio.sleep(5)
                         await client.send_cmd('/stop')
                         await client.close()
 
                         server_status = 0
-                        print('Server shutdown successful.')
+                        print('Server shutdown successful.') 
 
-                        # TODO: Laptop shutdown logic
-                        # TODO: Give the server atleast 30 secs so that things are saved properly + allow time to cancel the shutdown.
-                        asyncio.sleep(30)
-                        ssh = paramiko.SSHClient()
+                        await asyncio.sleep(30)
+
+                        ssh = paramiko.SSHClient() # Creates a blank terminal window
+                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy()) # Auto trusts unknown new connections
+
+                        private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
+
+                        ssh.connect(MSI_IP, username=os.getenv('SSH_USER'), pkey=private_key)
+                        ssh.exec_command('shutdown -h now')
+                        ssh.close()
 
                         msi_status = 0
                         print('MSI Laptop shutdown successful.')
                         return
 
                     except Exception as e:
-                        print(f"Failed to send stop command: {e}")
+                        print(f"Failed to send a stop command: {e}")
                         return
 
         # 4. else [exception caught] (server is off)

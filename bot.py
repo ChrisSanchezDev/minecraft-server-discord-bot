@@ -61,7 +61,7 @@ def create_status_embed(display_status='offline', player_count=0, player_list=No
         color = discord.Color.orange()
         title = '🟠 Server Booting...'
         desc = 'Please wait for services to start. (If longer than 3 mins, it prolly crashed)'
-    else:
+    elif display_status == 'online':
         color = discord.Color.green()
         title = '🟢 Server Online'
         desc =  f'**{player_count}/12** players connected.'
@@ -72,7 +72,7 @@ def create_status_embed(display_status='offline', player_count=0, player_list=No
     if display_status == 'online' and player_list:
         embed.add_field(name='Online Users', value='\n'.join(player_list), inline=False)
 
-    embed.set_footer(text='Minecwaft-Turtle • Refreshes every 30s')
+    embed.set_footer(text=f'Minecwaft-Turtle • Refreshes every 30s • {datetime.now()}')
     
     return embed
 
@@ -106,10 +106,10 @@ async def update_server_info():
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
-            ssh.connect(MSI_IP, username=SSH_USER, pkey=private_key, timeout=5)
+            ssh.connect(MSI_IP, username=SSH_USER, pkey=private_key, timeout=10)
             stdin, stdout, stderr = ssh.exec_command('pgrep -f "server.jar"')
 
-            stdout.channel.settimeout(5.0) # If no answer for 5 secs, fail
+            stdout.channel.settimeout(10.0) # If no answer for # secs, fail
             script_status = stdout.channel.recv_exit_status() # 0: found, 1: not found
 
             ssh.close()
@@ -129,7 +129,7 @@ async def update_server_info():
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             private_key = paramiko.RSAKey.from_private_key_file(SSH_KEY_PATH)
-            ssh.connect(MSI_IP, username=SSH_USER, pkey=private_key, timeout=5)
+            ssh.connect(MSI_IP, username=SSH_USER, pkey=private_key, timeout=10)
             ssh.exec_command('shutdown -h now')
             ssh.close()
             return True
@@ -161,8 +161,12 @@ async def update_server_info():
 
     # 1. If laptop is on (setup)
     try:
-        output = await run_blocking(ping_msi)
-        msi_status = int(output.returncode == 0) # 0 == success
+        for attempt in range(1, 4):
+            output = await run_blocking(ping_msi)
+            success = int(output.returncode == 0)
+            if success == 1:
+                break
+        msi_status = success
     except Exception as e:
         print(f'Ping failed: {e}')
         msi_status = 0
@@ -173,11 +177,12 @@ async def update_server_info():
         try:
             server = await JavaServer.async_lookup(f'{MSI_IP}')
             status = await server.async_status()
-
-            server_status = 1
+            
+            script_status, server_status = 1, 1
             player_count = status.players.online
             player_list = [p.name for p in status.players.sample] if status.players.sample else []
             display_status = 'online'
+            print(f'msi_status: {msi_status}, script_status: {script_status}, server_status: {server_status}')
 
             # 2.1. If server is inactive
 
@@ -203,12 +208,14 @@ async def update_server_info():
                         success = await run_blocking(shutdown_msi)
 
                         if success:
-                            msi_status = 0
+                            msi_status, server_status, script_status = 0, 0, 0
                             print('MSI Laptop shutdown successful.')
+                            print(f'msi_status: {msi_status}, script_status: {script_status}, server_status: {server_status}')
                             return
                         
                     except Exception as e:
                         print(f"Failed to send a stop command: {e}")
+                        print(f'msi_status: {msi_status}, script_status: {script_status}, server_status: {server_status}')
                         return
 
         # 4. else [exception caught] (server is off)
@@ -226,6 +233,7 @@ async def update_server_info():
             # 4. If script is on
             if script_status == 1:
                 display_status = 'booting'
+                print(f'msi_status: {msi_status}, script_status: {script_status}, server_status: {server_status}')
                 '''
                 # TODO: last_line_age logic
                 last_line_age = 0 # For testing now
@@ -243,11 +251,14 @@ async def update_server_info():
             # 8. else (script off)
             else:
                 display_status = 'offline'
+                print(f'msi_status: {msi_status}, script_status: {script_status}, server_status: {server_status}')
+                
         
     # 9. else (laptop off)
     else:
         msi_status, server_status, script_status = 0, 0, 0
         display_status = 'offline'
+        print(f'msi_status: {msi_status}, script_status: {script_status}, server_status: {server_status}')
     
     if display_status != 'online':
         player_count = 0

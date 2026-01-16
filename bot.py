@@ -29,7 +29,7 @@ RCON_PORT = int(os.getenv('RCON_PORT'))
 RCON_PASS = os.getenv('RCON_PASSWORD')
 SSH_USER = os.getenv('SSH_USER')
 SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
-INACTIVE_TIMER = os.getenv('INACTIVE_TIMER')
+INACTIVE_TIMER = int(os.getenv('INACTIVE_TIMER'))
 
 # 0 means off, 1 means on
 msi_status, script_status, server_status = 0, 0, 0
@@ -96,9 +96,9 @@ async def update_server_info():
 
     def ping_msi():
         return subprocess.run(
-            'ping', '-c', '1', '-W', '1', MSI_IP,
+            ['ping', '-c', '1', '-W', '1', MSI_IP],
             stdout=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL
         )
     
     def check_script_status():
@@ -177,7 +177,7 @@ async def update_server_info():
             server_status = 1
             player_count = status.players.online
             player_list = [p.name for p in status.players.sample] if status.players.sample else []
-            display_status == 'online'
+            display_status = 'online'
 
             # 2.1. If server is inactive
 
@@ -244,10 +244,10 @@ async def update_server_info():
             else:
                 display_status = 'offline'
         
-        # 9. else (laptop off)
-        else:
-            msi_status, server_status, script_status = 0, 0, 0
-            display_status = 'offline'
+    # 9. else (laptop off)
+    else:
+        msi_status, server_status, script_status = 0, 0, 0
+        display_status = 'offline'
     
     if display_status != 'online':
         player_count = 0

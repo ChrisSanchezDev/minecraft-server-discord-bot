@@ -8,7 +8,4 @@ This repo specifically just entails the code for the discord bot's functions. It
 
 ## Known Issues:
 
-* Booting seems inconsistent. While booting up, the status will tend to jump from booting, to offline, to online.
-    * Booting should specifically be enabled when the laptop is on and the server is in the progress of starting up (the script is active but the server isn't)
-* Laptop isn't properly being shutdown (maybe a shutdown permissions issue?)
-* Starting the program only actually works when the laptop is being booted up (we should have a different job for starting it w/ the laptop vs. starting it while the laptop is already on)
+* Spamming the Refresh button can cause the program to freak out a bit.

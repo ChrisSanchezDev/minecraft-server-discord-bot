@@ -46,22 +46,24 @@ class ServerControlView(discord.ui.View):
     async def start_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
 
+        global display_status
         if display_status != 'offline':
             button.disabled = True
-
-        send_magic_packet(MSI_MAC)
-        await interaction.followup.send(
-            'Magic Packet sent! The server is waking up. The dashboard will update shortly.',
-            ephemeral=True
-        )
-
-        embed = create_status_embed(display_status='booting')
-        button.disabled = True #
+        else: 
+            send_magic_packet(MSI_MAC)
+            await interaction.followup.send(
+                'Magic Packet sent! The server is waking up. The dashboard will update shortly.',
+                ephemeral=True
+            )
+            display_status = 'booting'
+        
+        embed = create_status_embed(display_status=display_status)
+        button.disabled = False
 
         await interaction.message.edit(embed=embed, view=self)
     
     @discord.ui.button(label='Refresh Status', style=discord.ButtonStyle.secondary, custom_id='refresh_btn', emoji='🔄')
-    async def refresh_button(self, interaction: discord.Interaction):
+    async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await update_server_info()
     

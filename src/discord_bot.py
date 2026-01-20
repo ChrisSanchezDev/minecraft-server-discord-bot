@@ -9,7 +9,6 @@
 # -----IMPORTS & SETUP-----
 import os
 import discord
-from aiomcrcon import Client
 from datetime import datetime
 from discord.ext import tasks, commands
 from dotenv import load_dotenv

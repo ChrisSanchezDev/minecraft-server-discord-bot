@@ -3,6 +3,8 @@
 import os
 from mcstatus import JavaServer
 from datetime import datetime, timedelta
+from aiomcrcon import Client
+import asyncio
 
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 INACTIVE_TIMER = os.getenv('INACTIVE_TIMER')

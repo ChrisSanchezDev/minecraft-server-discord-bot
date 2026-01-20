@@ -1,5 +1,15 @@
 # -----UPDATING SERVER INFO-----
 # Every 30 secs + whenever a user clicks refresh, the program will go thru multiple checks to see the status of the MSILaptop, script, and server itself.
+import os
+from mcstatus import JavaServer
+from datetime import datetime, timedelta
+
+CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
+INACTIVE_TIMER = os.getenv('INACTIVE_TIMER')
+MSI_IP = os.getenv('MSI_IP')
+RCON_PORT = int(os.getenv('RCON_PORT'))
+RCON_PASS = os.getenv('RCON_PASSWORD')
+
 async def update_server_info():
     global display_status
     global msi_status

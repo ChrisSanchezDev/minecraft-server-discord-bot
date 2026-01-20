@@ -1,3 +1,8 @@
+import os
+from dotenv import load_dotenv
+
+SERVER_IP = os.getenv('SERVER_IP')
+
 # -----DASHBOARD SETUP-----
 # Factory function
 def create_status_embed(display_status='offline', player_count=0, player_list=None):

@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CURR_OS = os.getenv('CURR_OS')
 RCON_PORT = int(os.getenv('RCON_PORT'))
 RCON_PASS = os.getenv('RCON_PASSWORD')
 SSH_USER = os.getenv('SSH_USER')
@@ -18,10 +17,9 @@ async def run_blocking(func, *args):
     return await loop.run_in_executor(None, func, *args) # ???: What is .run_in_executor
 
 def ping_msi():
-    if CURR_OS == 'windows':
-        param = '-n'
-    else:
-        param = '-c'
+    param = '-n' if os.name == 'nt' else '-c' # -n for Windows, -c for Linux. 
+    # .name = nt means Windows
+    
     return subprocess.run(
         'ping', param, '1', '-W', '1', MSI_IP, # ???: What is -W
         stdout=subprocess.DEVNULL,

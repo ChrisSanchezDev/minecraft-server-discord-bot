@@ -1,25 +1,38 @@
-# discord_bot.py
+# Necessary dotenv env variables
+### discord_bot.py
 
-Future idea:
+BOT_TOKEN: Discord bot token
+MSI_MAC: MAC address of the server device (MSI Laptop for me)
 
-    Stop Server button for when no one is on the server (Maybe we can have it so if you have a specific role, you can turn it off at anytime)
+### logger.py
 
-        @discord.ui.button(label='Stop Server', style=discord.ButtonStyle.red, custom_id='stop_btn', emoji='⛔')
-        async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-            # Gives a defer message to discord (it asks for Discord to wait longer for a response)
-            await interaction.response.defer(ephemeral=True)
+LOG_FILE: Name of the log file (.log)
+LOGGER_NAME: Name for the logger object
 
-            if display_status != 'online':
-                button.disabled = True
+### tools.py
 
-            send_magic_packet(MSI_MAC)
+RCON_PORT: Port for RCON (Remote Console)
+RCON_PASS = Password for RCON
+SSH_USER = SSH username for server device
+SSH_KEY_PATH = Path for the SSH key (since shutdown can't occur if a password is asked for). I recommend removing all permissions EXCEPT the shutdown command.
+MSI_IP = IP address for server device
 
-            await interaction.followup.send(
-                'Magic Packet sent! The server is waking up. The dashboard will update shortly.',
-                ephemeral=True
-            )
+### ui_templates.py
 
-            embed = create_status_embed(display_status='booting')
+SERVER_IP: IP address of the minecraft server
 
-            button.disabled = True # ??? Does this gray out the button?
-            await interaction.message.edit(embed=embed, view=self)
+### update_server_info.py
+
+CHANNEL_ID: Id of the channel containing the message
+INACTIVE_TIMER: Amount of minutes before the server is automatically disabled
+MSI_IP = IP address for server device
+RCON_PORT: Port for RCON (Remote Console)
+RCON_PASS = Password for RCON
+
+### Copy+Paste for .env
+
+BOT_TOKEN=
+CHANNEL_ID:
+MSI_MAC:
+SERVER_IP:
+INACTIVE_TIMER

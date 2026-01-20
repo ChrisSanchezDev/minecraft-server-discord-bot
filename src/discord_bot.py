@@ -4,24 +4,21 @@
 # TODO: Crash logs
 # TODO: Auto-restart on Crash
 # TODO: Stop button (with the right user perms)
+# TODO: Adjust datetime size
 
 # -----IMPORTS & SETUP-----
 import os
 import discord
 from aiomcrcon import Client
-from datetime import datetime, timedelta
+from datetime import datetime
 from discord.ext import tasks, commands
 from dotenv import load_dotenv
 from wakeonlan import send_magic_packet
-from mcstatus import JavaServer
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 MSI_MAC = os.getenv('MAC_ADDRESS')
-SERVER_IP = os.getenv('SERVER_IP')
-INACTIVE_TIMER = os.getenv('INACTIVE_TIMER')
 
 # 0 means off, 1 means on
 msi_status, script_status, server_status = 0, 0, 0

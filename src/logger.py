@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from logging.handlers import RotatingFileHandler
 
-LOG_FILE = 'mc-server-discord-bot.log'
+LOG_FILE = 'mc-server-discord-bot.log' # !!!!!!
 MAX_BYTES = 5 * 1024 * 1024 # 5MB
 BACKUP_COUNT = 3
 LOG_STATE = os.getenv('DEBUG_OR_INFO_LOGS')
@@ -20,7 +20,7 @@ formatter = logging.Formatter('%(asctime) - %(levelname)s - %(name)s - %(message
 rotate_handler.setFormatter(formatter)
 
 # Setting up logger object for importing
-logger = logging.getLogger('Minecwaft-Turtle')
+logger = logging.getLogger('Minecwaft-Turtle') # !!!!!!
 if LOG_STATE == 'debug':
     logger.setLevel(logging.DEBUG)
 else:

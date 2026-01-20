@@ -6,11 +6,8 @@
 # TODO: Stop button (with the right user perms)
 
 # -----IMPORTS & SETUP-----
-import asyncio 
 import os
 import discord
-import paramiko
-import subprocess
 from aiomcrcon import Client
 from datetime import datetime, timedelta
 from discord.ext import tasks, commands
@@ -62,38 +59,17 @@ class ServerControlView(discord.ui.View):
 
         await interaction.message.edit(embed=embed, view=self)
     
+    
     @discord.ui.button(label='Refresh Status', style=discord.ButtonStyle.secondary, custom_id='refresh_btn', emoji='🔄')
     async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await update_server_info()
-    
-    ''' Stop Server button for when no one is on the server (Maybe we can have it so if you have a specific role, you can turn it off at anytime)
-    @discord.ui.button(label='Stop Server', style=discord.ButtonStyle.red, custom_id='stop_btn', emoji='⛔')
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Gives a defer message to discord (it asks for Discord to wait longer for a response)
-        await interaction.response.defer(ephemeral=True)
-
-        if display_status != 'online':
-            button.disabled = True
-
-        send_magic_packet(MSI_MAC) # ??? If this doesn't work, will it crash or just continue?
-
-        await interaction.followup.send(
-            'Magic Packet sent! The server is waking up. The dashboard will update shortly.',
-            ephemeral=True
-        )
-
-        embed = create_status_embed(display_status='booting')
-
-        button.disabled = True # ??? Does this gray out the button?
-        await interaction.message.edit(embed=embed, view=self)
-    '''
 
 # -----BACKGROUND LOOPS & EVENTS-----
 @tasks.loop(seconds=30)
 async def periodically_update_status():
     await update_server_info()
-
+    
 @bot.event
 async def on_ready():
     print(f'Logged in as BOT:{bot.user} (ID: {bot.user.id})')

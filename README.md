@@ -6,6 +6,6 @@ The bot itself shares the status of the server on discord thru a Discord Bot, wh
 
 This repo specifically just entails the code for the discord bot's functions. It doesn't include the current setup of the MSI Laptop or the attachment of this script to my Raspberry Pi 4 whenever it boots or reboots.
 
-## Known Issues:
+## Known Issues
 
 * Spamming the Refresh button can cause the program to freak out a bit.

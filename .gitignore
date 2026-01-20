@@ -1,2 +1,7 @@
 venv/
 .env
+*.log
+logs/
+
+.vscode/
+.out-of-code-insights/

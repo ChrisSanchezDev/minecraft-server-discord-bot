@@ -12,28 +12,6 @@ async def update_server_info():
     if not channel:
         return
 
-    '''
-    # Logic Path for Checking Statuses
-    # 1. If laptop is on - +
-        # 2.if server responds +
-            # 'online'
-            # 2.1. If server is inactive
-                # 'offline'
-        # 3. else [exception caught] (server not responding) - 
-            # 4. if script is on
-                # 5. if last_line_age is old
-                    # 'crashed'
-                    # 5.1. create crash.log
-                    # 5.2. shutdown server (auto restart?)
-                # 6. else: (last_line_age still young)
-                    # 'booting'
-            # 7. else (script off) -
-                # 'offline'
-    # 8. else (laptop off)
-        # 'offline'
-    # Most of the time, the server will be offline and this allows for the fastest check on that + accounting for all variations of the status.
-    '''
-
     # 1. If laptop is on (setup)
     try:
         output = await run_blocking(ping_msi)

@@ -60,23 +60,3 @@ class ServerControlView(discord.ui.View):
     async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer(ephemeral=True)
         await update_server_info()
-
-# -----BACKGROUND LOOPS & EVENTS-----
-@tasks.loop(seconds=30)
-async def periodically_update_status():
-    await update_server_info()
-    
-@bot.event
-async def on_ready():
-    print(f'Logged in as BOT:{bot.user} (ID: {bot.user.id})')
-
-    if not periodically_update_status.is_running():
-        periodically_update_status.start()
-
-    # Required for persistent views to work after a bot restarts
-    bot.add_view(ServerControlView())
-
-    print ('Dashboard is now active and listening for inputs.')
-
-if __name__ == '__main__':
-    bot.run(BOT_TOKEN)

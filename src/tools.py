@@ -16,16 +16,6 @@ async def run_blocking(func, *args):
     loop = asyncio.get_running_loop() #???: What is get_running_loop
     return await loop.run_in_executor(None, func, *args) # ???: What is .run_in_executor
 
-def ping_msi():
-    param = '-n' if os.name == 'nt' else '-c' # -n for Windows, -c for Linux. 
-    # .name = nt means Windows
-    
-    return subprocess.run(
-        'ping', param, '1', '-W', '1', MSI_IP, # ???: What is -W
-        stdout=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL
-    )
-
 def check_script_status():
     try:
         ssh = paramiko.SSHClient()
@@ -47,6 +37,17 @@ def check_script_status():
     except Exception as e:
         print(f'Script status check failure: {e}')
         return 0
+    
+def ping_msi():
+    param = '-n' if os.name == 'nt' else '-c' # -n for Windows, -c for Linux. 
+    # .name = nt means Windows
+    
+    return subprocess.run(
+        'ping', param, '1', '-W', '1', MSI_IP, # ???: What is -W
+        stdout=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL
+    )
+
 
 def shutdown_msi():
     print('Attempting MSI Laptop shutdown...')
